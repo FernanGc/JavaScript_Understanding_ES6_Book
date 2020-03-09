@@ -590,7 +590,7 @@ let iterator = createIterator();
 console.log(iterator.next().value);
 console.log(iterator.next().value);
 console.log(iterator.next().value);
-````` 
+`````
 
 **Generator function expressions**
 
@@ -1068,3 +1068,437 @@ run(function*() {
     console.log('Done');
 });
 ````
+
+## Introducting JavaScript Classes
+
+**Class Declarations**
+
+A basic class declaration begin with the `class` keyword followed by name of the class. 
+
+````javascript
+class PersonClass {
+
+    constructor(name) {
+        this.name = name;
+    }
+
+    sayName() {
+        console.log(this.name);
+    }
+}
+
+let person = new PersonClass('Nicholas');
+person.sayName();
+
+console.log(person instanceof PersonClass);
+console.log(person instanceof Object);
+
+console.log(typeof PersonClass);
+console.log(typeof PersonClass.prototype.sayName);
+````
+
+* Class declarations, unlike function declarations, are not hoisted. Class declarations act like `let` declarations, so they exist in the temporal dead zone until execution reaches the declaration.
+* All code inside class declarations runs in strict mode automatically. There's no way to opt out of strict mode inside classes.
+* All methods are none numerable. This is a significant change from custom types, where you need to use `Object.defineProperty()` to make a method nonenumerable.
+* All methods lack an internal `[[Construct]]` method and will throw an error if you try to call them with new.
+* Calling the class constructor without new throws an error.
+* Attempting to overwrite the class name within a class method throws an error.
+
+With all of these differences in mind, the `PersonClass` declaration in the previous  example is directly equivalent to the following code, which doesn't use the class syntax:
+
+````javascript
+let PersonType2 = (function() {
+    'use strict';
+
+    const PersonType2 = function(name) {
+
+        // make sure the function was called with new
+        if (typeof new.target === 'undefined') {
+            throw new Error('Constructor must be called with new.');
+        }
+
+        this.name = name;
+    }
+
+    Object.defineProperty(PersonType2.prototype, 'sayName', {
+        value: function() {
+            // make sure the method wasn't called with new
+            if (typeof new.target !== 'undefined') {
+                throw new Error('Method cannot be called with new');
+            }
+
+            console.log(this.name);
+        },
+        enumerable: false,
+        writable: true,
+        configurable: true
+    });
+
+    return PersonType2;
+
+}());
+````
+
+**Class Expressions**
+
+Classes and functions are similar in that they have two from: declarations  and expressions. Function and class declarations begin with an appropriate have an expression from that doesn't require an identifier after `function`, similarly, classes have and expression from that doesn't requiere an identifier after `class` . These *class expressions* are designed to be used in variable declarations or passed into functions as arguments.
+
+**A Basic Class Expression**
+
+````javascript
+let PersonClass = class {
+    constructor(name) {
+        this.name = name;
+    }
+
+    sayName() {
+        console.log(this.name);
+    }
+};
+
+let person = new PersonClass('Nocholas');
+person.sayName();
+
+console.log(person instanceof PersonClass);
+console.log(person instanceof Object);
+
+console.log(typeof PersonClass);
+console.log(typeof PersonClass.prototype.sayName);
+````
+
+As this example demonstrates, class expressions do not require identifiers after class. Aside from the syntax, class expressions are functionally equivalent to class declarations.
+
+Whether you use class declarations or class expressions is mostly a matter of style.
+
+**Accessor Properties**
+
+You should create own properties inside class constructors, classes allow you to define accessor properties on the prototype. To create a getter, use the keyword get followed by a space, followed by an identifier; to create a setter, do the same using the keyword set, as shown here:
+
+````javascript
+class CustomHTMLElement {
+    constructor(element) {
+        this.element = element;
+    }
+
+    get html() {
+        return this.element.innerHTML;
+    }
+
+    set html(value) {
+        this.element.innerHTML = value;
+    }
+}
+
+var descriptor = Object.getOwnPropertyDescriptor(CustomHTMLElement.prototype, "html");
+console.log('get' in descriptor); // true
+console.log('set' in descriptor); // true
+console.log(descriptor.enumerable); // false
+````
+
+**Computed Member Names**
+
+Class methods and accessor properties can also have computed names. Instead of using an identifier, use square brackets around an expression, which is the same syntax you use for object literal computed names. For example.
+
+````javascript
+let methodName = "sayName";
+
+class PersonClass {
+    constructor(name) {
+        this.name = name;
+    }
+
+    [methodName]() {
+        console.log(this.name);
+    }
+};
+
+let me = new PersonClass('Nicholas');
+me.sayName
+````
+
+**Generator Methods**
+
+You can define a generator on an object literal by prepending an asterisk (*) to the method name. The same syntax works for classes as well, allowing any method to be a generator. Here's an example:
+
+```javascript
+class MyClass {
+    *createIterator() {
+        yield 1;
+        yield 2;
+        yield 3;
+    }
+}
+
+let instance = new MyClass();
+let iterator = instance.createIterator();
+```
+
+Generator methods are useful when you have an object that represents a collection of values an you want to iterate over those values easily. Defining a default iterator for your class is much more helpful if the class  represents a collection of values. You can define the default iterator for a class by using `Symbot.iterator` to define a generator method.
+
+````javascript
+class Collection {
+    constructor() {
+        this.items = [];
+    }
+
+    *[Symbol.iterator]() {
+        yield *this.items;
+    }
+}
+
+const collection = new Collection();
+collection.items.push(1);
+collection.items.push(2);
+collection.items.push(3);
+
+for (let x of collection) {
+    console.log(x);
+}
+````
+
+**Static Members**
+
+ECMAScript 6 classes simplify the creation of static members by using the formal `static` annotation before the method or accessor property name.
+
+```javascript
+class PersonClass {
+    // equivalent of the PersonType constructor
+    constructor(name) {
+        this.name = name;
+    }
+
+    // equivalent of PersonType.prototype.sayName
+    sayName() {
+        console.log(this.name);
+    }
+
+    // equivalent of PersonType.create
+    static create(name) {
+        return new PersonClass(name)
+    }
+}
+
+let person = PersonClass.create('Nicholas');
+```
+
+You can use `static` keyword on any method or accessor property definition within a class. The only restriction is that you can't use static with the `constructor` method definition.
+
+> Static members are not accessible from instances. You must always access static members from the class directly.
+
+**Ingeritance with Derived Classes**
+
+Classes make inheritance easier to implement by using the familiar `extends` keyword to specify the function from which the class should inherit. The prototypes are automatically adjusted, and you can access the base class constructor by calling the `super()` method.
+
+```javascript
+class Rectangle {
+
+    constructor(length, width) {
+        this.length = length;
+        this.width = width;
+    }
+
+    getArea() {
+        return this.length * this.width;
+    }
+}
+
+class Square extends Rectangle {
+
+    constructor(length) {
+        // equivalent of Rectangle.call(this, length, length)
+        super(length, length);
+    }
+}
+
+const square = new Square(3);
+
+console.log(square.getArea());
+console.log(square instanceof Square);
+console.log(square instanceof Rectangle);
+```
+
+> You can only use `super()` in a derived class constructor. If you try to use it in a non derived class (a class that doesn't use extends) or a function, it will throw an error.
+
+> You must call `super()` before accessing `this` in the constructor. Because `super()` is responsible for initializing this, attempting to access `this` before calling `super()` results in an error.
+
+> The only way to avoid calling super() is to return an object from the class constructor.
+
+**Shadowing Class Methods**
+
+````javascript
+class Square extends Rectangle {
+
+    constructor(length) {
+        // equivalent of Rectangle.call(this, length, length)
+        super(length, length);
+    }
+
+    getArea() {
+        return this.length * this.length;
+    }
+}
+````
+
+Because the `getArea()` method is defined as part of Square, the method `Rectangle.prototype.getAre()` will no longer be called by any instances of Square. Of course, you can always decide to call the base class version of the method by using the `super.getArea()` method, like this:
+
+````javascript
+class Square extends Rectangle {
+
+    constructor(length) {
+        // equivalent of Rectangle.call(this, length, length)
+        super(length, length);
+    }
+
+    getArea() {
+        return super.getArea();
+    }
+}
+````
+
+**Inherited Static Members**
+
+If a base class has static members, those static members are also available on the derived class. Inheritance works like that in other languages, buy this is a new concept in JavaScript.
+
+````javascript
+class Rectangle {
+
+    constructor(length, width) {
+        this.length = length;
+        this.width = width;
+    }
+
+    getArea() {
+        return this.length * this.width;
+    }
+
+    static create(length, width) {
+        return new Rectangle(length, width);
+    }
+}
+
+class Square extends Rectangle {
+
+    constructor(length) {
+        // equivalent of Rectangle.call(this, length, length)
+        super(length, length);
+    }
+}
+
+const rect = Square.create(3, 4);
+
+console.log(rect instanceof Rectangle); // true
+console.log(rect.getArea()); // 12
+console.log(rect instanceof Square); // false
+````
+
+Through inheritance, the `static create()` method is available as `Square.create()` and behaves like the `Rectangle.create()`.
+
+## Improved Array Capabilities
+
+**The Array.of() Method**
+
+The `Array.of()` method always creates an array containing its arguments regardless of the number of arguments or the arguments types. Here are some examples that use the `array.of()` method:
+
+To create an array with the `Array.of()` method, just pass it the values you want in your array.
+
+````javascript
+let items = Array.of(1, 2);
+console.log(items.length);
+console.log(items[0]);
+console.log(items[1]);
+````
+
+````javascript
+let items = Array.of(2);
+console.log(items.length);
+console.log(items[0]);
+````
+
+````javascript
+let items = Array.of("2");
+console.log(items.length);
+console.log(items[0]);
+````
+
+If you ever need to pass the Array constructor into a function, you might want to pass Array.of() instead to ensure constant behavior. For example:
+
+````javascript
+function createArray(arrayCreator, value) {
+    return arrayCreator(value);
+}
+````
+
+> The Array.of() method does not use the Symbol.species property to determine the type of return value. Instead, it uses the current constructor (this inside the of() method) to determine the correct data type to return.
+
+**The Array.from() Method**
+
+The `Array.from()` call creates a new array based on the items in arguments. So args is an in an instance of Array that contains the same values in the same positions as arguments.
+
+> The `Array.from()` method also uses this to determine the type of array to return.
+
+**New Methods on All Arrays**
+
+ECMAScript 6  introduce the `find()` and `findIndex()` methods. Both `find()` `findIndex()` accept two arguments: a callback function and an optional value to use for `this` inside the callback function. The callback function is passed an array element, the index of that element in the array, the index of that element in the array and the actual array----the same arguments passed to methods like `map()` and `forEach()`. The callback should return `true` if the given value matches some criteria you define. Both `find()` and `findIndex()` also stop searching the array the first time the callback function returns the value, whereas `findIndex()` returns the index at which the value was found.
+
+````javascript
+let numbers = [25, 30, 35, 40, 45];
+
+console.log(numbers.find(n => n > 33));
+console.log(numbers.findIndex(n => n > 33));
+````
+
+This code calls `find()` and findIndex() to locate the first value in the numbers array that is greater than 33. The call to `find()` returns 35 and `findIndex()` returns 2, the location of 35 in the numbers array.
+
+Both `find()` method `findIndex()` are usuful to find an array element that matches a condition rather than a value. If you only want to find a value `indexOf()` and lastIndexOf() are better choices.
+
+**The fill() Method**
+
+the `fill()` method fills one or more array elements with a specific value. When passed a value,`fill()` overwrites all the values in an array with that value.
+
+````javascript
+let numbers = [1, 2, 3, 4];
+numbers.fill(1);
+
+console.log(numbers.toString());
+````
+
+Here, the call to `numbers.fill(1)` changes all elements in numbers to 1. If you want to change only some of the elements rather than all of them, you can optionally include a start index and an exclusive end index.
+
+```javascript
+let numbers = [1, 2, 3, 4];
+numbers.fill(1, 2);
+
+console.log(numbers.toString());
+numbers.fill(0, 1, 3);
+console.log(numbers.toString());
+```
+
+**The copyWithin() Method**
+
+The `copyWithin()` method is similar to `fill()` in that it changes multiple array elements at the same time, `copyWithin()` lets you copy array element values from the array. To accomplish that, you need to pass two arguments to the `copyWithin()` method: the index where the method should start filling values and the index where the values to be copied begin.
+
+For instance, to copy the values from the fist two elements in an array in an array to the last two items in the array, you can do the following.
+
+````javascript
+let numbers = [1, 2, 3, 4];
+
+// paste values into array starting at index 2
+// copy values from array starting at index 0
+numbers.copyWithin(2, 0);
+
+console.log(numbers.toString()); // 1, 2, 1, 2
+````
+
+This code pastes values into numbers beginning from index 2, so indexes 2 an 3 will be overwritten. Passing 0 as the second argument to `copyWithin()` starts copying values from index 0 and continues until there are no more elements to copy into. By default, `copyWithin()` always copies values up to the end of the array by you can provide an optional thirdj argument to limit how many elements will be overwritten. That third argument is an exclusive an index at which copying of values stops. Here's how that looks in code:
+
+````javascript
+let numbers = [1, 2, 3, 4];
+
+// paste values into array starting at index 2
+// copy values from array starting at index 0
+// stop copying values when you hit index 1
+numbers.copyWithin(2, 0, 1);
+
+console.log(numbers.toString()); // 1, 2, 1, 2
+````
+
