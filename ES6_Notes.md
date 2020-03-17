@@ -1502,3 +1502,438 @@ numbers.copyWithin(2, 0, 1);
 console.log(numbers.toString()); // 1, 2, 1, 2
 ````
 
+# Promises and Asynchornous Programming
+
+JavaScript engines are built on the concept of a single-threaded event loop. *Single-threaded* means that only one pice of code is executed at a time. The *event loop* is a process inside the JavaScript engine that monitors code execution an manges the job queue. Keep in mind that as a queue, job execution rons from the first job in the queue to the last.
+
+**Promise Basics**
+
+A promise is a placeholder for the result of an asynchronous operation. Instead of subscribing to an event or passing a callback to a function, the function can return a promise, as shown here:
+
+````javascript
+// readFile promises to complete at some point in the future
+let promise = readFile('example.txt');
+````
+
+**The Promise Life Cycle**
+
+Each promise goes through a short life cycle starting in the ***pending*** state, which indicates that the asynchronous  operation hasn't complete yet.
+
+A pending promise is considered ***unsettled***. Once the asynchronous operation completes, the promise is considered ***settled*** and enters one of two possible states:
+
+* **Fulfilled** The promise's asynchronous operation has completed successfully.
+* **Rejected** The promise's asynchronous operation didn't complete successfully due to either an error or some other cause.
+
+An internal [[PromiseState]] property is set to "pending", ''fulfilled', or "rejected" to reflect the promise's state. This property isn't exposed on promise objects. But you can take a specific action when a promise changes state by using the `then()` method.
+
+The `then()` method is present on all promises an takes two arguments. The first argument is a function to call when the promise is fulfilled. The second argument is a function to call when the promise is rejected. Similar to the fulfillment function.
+
+> Any object that implements the `then()` method as described in the preceding paragraph is called a thenable. Al promises are thenables, bu all thenables are not promises.
+
+Both arguments to `then()` are optional, so you can listen for any combination of fulfillment and rejection. For example, consider this set of `them()` calls:
+
+````javascript
+let fs = require("fs");
+
+let promise = fs.readFile('config.json');
+
+promise.then((contents) => {
+    // fulfillment 
+    console.log(contents);
+}, (err) => {
+    // rejection
+    console.log(err.message);
+});
+
+promise.then((contents) => {
+    // fulfillment
+    console.log(contents);
+});
+
+promise.then(null, (err) => {
+    // rejection
+    console.error(err.message);
+});
+````
+
+Promises also have a `catch()` method that behaves the same as `then()` when only a rejection handler is passed.  For example, the following `catch()` and `then()` calls are functionally equivalent:
+
+````javascript
+promise.catch((err) => {
+    // rejection
+    console.error(err.message);
+});
+
+// is the same as:
+
+promise.then(null, (err) => {
+    // rejection
+    console.log(err.message);
+});
+````
+
+The `then()` and `catch()` methods are intended to be used in combination to properly handle the result of asynchronous  operations. Just know that if you don't attach a rejection handler to a promise,  all failures will happen silenly. Always attach a rejection handler, even if the handler just logs the failure.
+
+**Creating Unsettled Promises**
+
+New promises are created using the `Promise` constructor. This constructor accepts a single argument: a function called the `executor`, which contains the code to initialize the promise. The executor is passed two functions named `resolve()` and `reject()` as arguments. The `resolve()` function is called when the executor has finished successfully to signal that the promise is ready to resolve, whereas the `reject()` function indicates that the executor has failed.
+
+````javascript
+// Node.js example
+
+let fs = require('fs');
+
+function readFile(filename) {
+    return new Promise((resolve, reject) => {
+        // trigger the asynchonous operation
+        fs.readFile(filename, { encoding: 'utf8' }, (err, contents) => {
+            // check for errors
+            if (err) {
+                reject(err);
+                return;
+            }
+
+            // the read succeded
+            resolve(contents);
+        });
+    });
+}
+
+let promise = readFile("config.json");
+promise.then((contents) => console.log(contents), (err) => console.error(err.message));
+````
+
+Keep in mind that the executor runs immediately  when `readFile()` is called. When either `resolve()` or `reject()` is called inside the executor, a jov is added to the job queue to resolve the promise. This is called *job scheduling*. In job scheduling, you add a new job to the job queue to say "Don't execute this right now, by execute it later". For  instance, the `setTimeout()` function() function lets you specify a delay before a job is added to the queue:
+
+Calling `resolve()` triggers an asynchronous operation. Functions passed to `then()` and `catch()` are executed asynchronously, because these are also added to the job queue .
+
+```javascript
+let promise = new Promise((resolve, reject) => {
+    console.log('Promise');
+    resolve();
+});
+
+promise.then( () =>  {
+    console.log("Resolved");
+});
+
+console.log("Hi!");
+
+// Promise
+// Hi!
+// Resolved
+```
+
+The reason is that fulfillment and rejection handlers are always added to the end of the job queue after the executor has completed.
+
+**Chaining Promises**
+
+A number of ways are are available to chain promises  together to accomplish more complex asynchronous behavior.
+
+Each call to `them()` or `catch()` actually creates and returns another promise. This second promise is resolved only when the first has been fulfilled or rejected.
+
+````javascript
+let p1 = new Promise((resolve, reject) => resolve(42));
+
+p1.then(
+    (value) => console.log(value)
+).then(
+    () => console.log('Finished')
+);
+
+// 42
+// Finished
+````
+
+The call to `p1.then()` returns a second prmise on which `then()` is called. The second `then()` fulfillment handler is only called after the first promise has been resolved. If you unchain this example, it looks like this:
+
+````javascript
+let p1 = new Promise((resolve, reject) => resolve(42));
+let p2 = p1.then((value) => console.log(value));
+
+p2.then(() => console.log('Finished'));
+````
+
+**Catching Errors**
+
+Promise chaining allows you to catch errors that may occur in a fulfillment or rejection handler from a previous promise.
+
+````javascript
+let p1 = new Promise( (resolve, reject) => resolve(42) );
+
+p1.then( value => { throw new Error('Boom!'); } )
+    .catch( error => console.log(error.message)); // 'Boom!'
+````
+
+> *Always have a rejection handler at the end of a promise chain to ensure that you can properly handle any error that may occur.*
+
+**Returning Values in Promise Chains**
+
+Another important aspect of promise chains is the ability to pass data from one promise to the next.
+
+````javascript
+let p1 = new Promise( (resolve, reject) => resolve(42) );
+
+p1.then(value => {
+    console.log(value); // "42"
+    return value + 1;
+}).then( 
+    value => console.log(value) // "43"
+);
+````
+
+You could do the same thing with the rejection handler. When a rejection handler is called it may return a value. If it does, that value is used to fulfill the next promise in the chain, as in the next example.
+
+```javascript
+let p1 = new Promise( (resolve, reject) => reject(42) );
+
+p1.catch( value => {
+    // first fulfillment handler
+    console.log(value); // "42"
+    return value + 1;
+}).then( value => {
+    // second fulfillment handler
+    console.log(value); // '43'
+});
+```
+
+The failure of one promise can allow the recovery of the entire chain if necessary.
+
+**Returning Promises in Promise Chains**
+
+````javascript
+let p1 = new Promise( (resolve, reject) => resolve(42) );
+let p2 = new Promise( (resolve, reject) => resolve(43) );
+
+p1.then( value => {
+    // fist fulfillment handler
+    console.log(value);
+    return p2; // 42 from promise p2
+}).then( value => {
+    // second fulfillment handler
+    console.log(value); // 43
+});
+````
+
+The important thing to recognize about this pattern is that the second fulfillment handler is not aded to `p2` but rather to a third promise. The second fulfillment handler is therefore attached to that third promise, making the previous example  equivalent to this:
+
+````javascript
+let p1 = new Promise( (resolve, reject) => resolve(42) );
+
+let p2 = new Promise( (resolve, reject) => resolve(43) );
+
+let p3 = p1.then( value => {
+    // fist fulfillment handler
+    console.log(value); // 42
+    return p2;
+});
+
+p3.then( value => {
+    // second fulfillment handler
+    console.log(value); // 43
+});
+````
+
+You could attach a rejection handler instead:
+
+````javascript
+let p1 = new Promise( (resolve, reject) => resolve(42) );
+let p2 = new Promise( (resolve, reject) => reject(43) );
+
+p1.then( value => {
+    // fist fulfillment handler
+    console.log(value); // 42
+    return p2;
+}).catch( value => {
+    // rejection handler
+    console.log(value); // 43
+});
+
+````
+
+Returning thenables from fulfillment or rejection handlers doesn't change when the promise executors are executed. Returning thenables simply allows you to define additional responses to the promise results.
+
+````javascript
+let p1 = new Promise( (resolve, reject) => resolve(42) );
+
+p1.then( value => {
+    console.log(value); // 42
+    
+    return new Promise( (resolve, reject) => resolve(43) );
+}).then( value => console.log(value) );  // 43
+````
+
+This patter is useful when you want to wait until a previous promise has been settled before triggering another promise.
+
+## Responding to Multiple Promises
+
+Sometimes you'll want to monitor the progress of multiple promises to dermine the next action. ECMAScript 6 provides two methods that monitor multiple promises: `Promise.all()` and `Promise.race()`.
+
+**Prmise.all()**
+
+The `Promise.all()` method accepts a single argument, which is an iterable *(such an array)* of promises to monitor, an returns a promise that is resolved only when every promise in the iterable is resolved. The returned promise is fulfilled when every promise in the iterable is fulfilled.
+
+````javascript
+let p1 = new Promise( (resolve, reject) => resolve(42) );
+let p2 = new Promise( (resolve, reject) => resolve(43) );
+let p3 = new Promise( (resolve, reject) => resolve(44) );
+
+p4 = Promise.all([p1, p2, p3]);
+
+p4.then( value => {
+    console.log(Array.isArray(value)); // true
+    console.log( value[0] ); // 42
+    console.log( value[1] ); // 43
+    console.log( value[2] ); // 44
+});
+````
+
+The call to `Promise.all()` creates promise `p4`, which is ultimately fulfilled when promises `p1, p2, and p3` are fulfilled.  The result passed to the fulfillment handler for `p4` is an array containing each resolved value: 42, 43, and 44. The values are stored in order in which the promises that resolved to them. 
+
+​	If any promise passed to `Promise.all()` is rejected, the returned promise is immediately rejected without waiting for the other promises to complete:
+
+````javascript
+let p1 = new Promise( (resolve, reject) => resolve(42) );
+let p2 = new Promise( (resolve, reject) => reject(43) );
+let p3 = new Promise( (resolve, reject) => resolve(44) );
+
+p4 = Promise.all([p1, p2, p3]);
+
+p4.catch( value => {
+    console.log(Array.isArray(value)); // true
+    console.log(value);
+});
+````
+
+The rejection handler for p4 is called immediately without waiting for p1 or p3 to finish executing. The rejection handler always receives a single value rather than an array, an the vaue is the rejection value from the promise that was rejected.
+
+**The Promise.race() Method**
+
+The `promise.race()` method provides a slightly different take on monitoring multiple promises. This method also accepts an iterable of promises to monitor and returns a promise, but the returned promise is settled as soon as the first promise is settled. 
+
+```javascript
+let p1 = Promise.resolve(42);
+let p2 = new Promise( (resolve, reject) => resolve(43) );
+let p3 = new Promise( (resolve, reject) => resolve(44) );
+let p4 = Promise.race([p1, p2, p3]);
+
+p4.then( value => console.log(value) ); // 42
+```
+
+The promises passed to `Promise.race()` are truly in a race to see which is settled first. If the first promise to settle is fulfilled, the returned promise is fulfilled and the the same case for a rejected promise.
+
+```javascript
+let p1 = new Promise( (resolve, reject) => resolve(42) );
+let p2 = Promise.reject(43);
+let p3 = new Promise( (resolve, reject) => resolve(44) );
+
+let p4 = Promise.race([p1, p2, p3]);
+
+p4.catch( value => console.log(value) ); // 43
+```
+
+Here, p4 is rejected because p2 is already in the rejected state when `Promise.rece()` is called. Even though p1 and p3 are fulfilled, those results are ignored because they occur after p2 is rejected.
+
+**Inhering from Promises**
+
+Just like other built-in types can use a promise as the base for a derived class. This allows you to define your own variation of promises to extend wha built-in promises can do. For instance, suppose you want to create a promise that can use methods named `success()` and `failure()` in addition to the usual `then()` and `catch()` methods. You could create that promise type as follows:
+
+````javascript
+class MyPromise extends Promise {
+    
+    // use default constructor
+
+    success(resolve, reject) {
+        return this.then(resolve, reject);
+    }
+
+    failure(reject) {
+        return this.catch(reject);
+    }
+}
+
+let promise = new MyPromise( (resolve, reject) => resolve(42) );
+
+promise
+    .success( value => console.log(value) )
+    .failure( value => console.log(value) );
+````
+
+**Promise-Based Asynchronous Task Running**
+
+Simplify the task runner by using promises as a common interface for al asynchronous code:
+
+````javascript
+let fs = require('fs');
+
+function run(taskDef) {
+    // create the iterator
+    let task = taskDef();
+
+    // start the task
+    let result = task.next();
+
+    // recursive function to iterate through
+    (function step() {
+
+        // if there's more to do
+        if (!result.done) {
+
+            // resolve to a promise to make it easy
+            let promise = Promise.resolve(result.value);
+            promise.then( value => {
+                result = task.next(value);
+                step();
+            }).catch( error => {
+                result = task.throw(error);
+                step();
+            });
+        }
+    }());
+}
+
+
+// define a function to use with the task runner
+
+function readFile(filename) {
+    return new Promise( (resolve, reject) => {
+        fs.readFile( filename, function(err, contents) {
+            if (err) {
+                reject(err);
+            } else {
+                resolve(contents);
+            }
+        });
+    });
+}
+
+// run task
+
+run(function*() {
+    let contents = yield readFile('config.json');
+    console.log('The contents', JSON.parse(contents) );
+    console.log('Done');
+});
+````
+
+In this version of the code, a generic`run()` function executes a generator to create an iterator. It calls `task.next()` to astart the task and recursively calls `step()` until the iterator is complete.
+
+`Promise.resolve()` just passes through any promise passed in and wraps any non-promise value and passes the value back to the iterator.
+
+The only concern is ensuring that asynchronous functions like `readFile()` return a promise that correctly identifies its state. For Node.js built-in methods, that means you'll have to convert those methods to return promises instead of using callbacks.
+
+**Future asynchronous task running**
+
+The basic idea is to use a function marked with `async` instead of a generator an use await instead of yiled when calling a function, such as:
+
+````javascript
+(async function() {
+    let contents = await readFile('config.json');
+    doSomethingWith(contents);
+    console.log('Done');
+});
+````
+
+The `async` keyword before function indicates that the function is meant to run in an asynchronous manner. The `await` keyword signals that the function call to `readFile('config.json')` should return a promise, and if it doesn't, the response should be wrapped in a promise, `await` should return a promise, and if it doesn't the response is rejected and otherwise return the value from the promise.
+
+The end result is that you can write asynchronous code as if it were synchronous without the overhead of managing iterator-based state machine.
