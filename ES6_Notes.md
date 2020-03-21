@@ -1937,3 +1937,492 @@ The basic idea is to use a function marked with `async` instead of a generator a
 The `async` keyword before function indicates that the function is meant to run in an asynchronous manner. The `await` keyword signals that the function call to `readFile('config.json')` should return a promise, and if it doesn't, the response should be wrapped in a promise, `await` should return a promise, and if it doesn't the response is rejected and otherwise return the value from the promise.
 
 The end result is that you can write asynchronous code as if it were synchronous without the overhead of managing iterator-based state machine.
+
+## Async/Await
+
+A special sintax to work with promises in a more comfortable way.
+
+**Async functions**
+
+The `async` keyword can be placed before a function like this:
+
+````javascript
+async function myFunction() {
+    return 1;
+}
+````
+
+The keyword `async` before a function means that the current function returns a **promise**. Other values are wrapped in a resolved promise automatically.
+
+For instance this function returns a resolved promise with the result of 1:
+
+````javascript
+async function myFunction() {
+    return 1;
+}
+
+myFunction().then(alert);
+````
+
+We could explicitly return a promise, which would be the same:
+
+````javascript
+async function myFunction() {
+    return Promise.resolve(1);
+}
+
+myFunction().then(alert);
+````
+
+`async` ensures that the function returns a promise, and wraps non-promises in it.
+
+**Await**
+
+The syntax:
+
+````javascript
+// works only inside async functions
+let value = await promise;
+````
+
+The keyword `await` makes JavaScript wait until that promise settles and returns its result.
+
+```javascript
+// An example with a promise that resolves in 1 second
+
+async function myFunction() {
+    let promise = new Promise( (resolve, reject) => {
+        setTimeout(() => resolve('done!'), 1000);
+    });
+
+    let result = await promise; // wait until the promise resolves (*)
+
+    console.log(result); // 'done!'
+}
+
+myFunction();
+```
+
+> We can't use `await` in regular functions, `await` only works inside an `async function` 
+
+**Error Handling**
+
+If a promise resolves normally, then `await promise` returns the result. But in the case of a rejection, it throws the error, just as if there were a throw statement at that line.
+
+```javascript
+// This code
+async function myFunction() {
+    await Promise.reject(new Error('Whoops!'));
+}
+
+// is the same as this
+async function myFunction() {
+    throw new Error('Whoops!');
+}
+```
+
+In real situations, the promise may take some time before it rejects. In that case there will be a delay before `await` throws an error.
+
+We can catch that error using `try..catch`, the same way as a regular throw:
+
+````javascript
+async function myFunction() {
+
+    try {
+        let response = await fetch('http://no-such-url');
+    } catch (error) {
+        console.log(error); // TypeError: failed to fetch
+    }
+}
+
+myFunction();
+````
+
+In the case of an error, the control jumps to the `catch` block. We can also wrap multiple lines:
+
+````javascript
+async function myFunction() {
+    try {
+        let response = await fetch('/no-user-here');
+        let user = await response.json();
+    } catch(err) {
+        // catches errors both in fetch an response.json
+        console.log(err);
+    }
+}
+
+myFunction();
+````
+
+## Encapsulating code with Modules
+
+A `module` is JavaScript code that automatically runs in strict mode with no way to opt out. Contrary to a shared-everything architecture, variables created in the top level of a module aren't automatically added to the shared global scope.
+
+* The variables exist only within the top-level scope of the module.
+
+* The module must export any elements, like variables or functions, that should be available to code outside the module.
+
+* Modules may also import bindings from other modules.
+
+The real power of modules is the ability to export and import only bindings you need rather than everything in a file. A good understanding of exporting and importing is fundamental to understanding how modules differ from scripts.
+
+**Basic exporting**
+
+````javascript
+// export data
+export var color = 'red';
+export let name = 'Nicholas';
+export const magicNumber = 7;
+
+// export function
+export function sum(num1, num2) {
+    return num1 + num2;
+}
+
+// export class
+export class Rectangle {
+    constructor(length, width) {
+        this.length = length;
+        this.width = width;
+    }
+}
+
+// this function is private to the module
+function substract(num1, num2) {
+    return num1 - num2;
+}
+
+// define a function...
+function multiply(num1, num2) {
+    return num1 * num2;
+}
+
+// and then export it later
+export multiply;
+````
+
+You can't export anonymous functions or classes using this syntax unless you use the `dafault` keyword, The `multiply()` function isn't exported when it's defined. That works because you don't always need to export a declaration: you can also export references. 
+
+Any variables, functions, or classes that are not explicitly exported remain private to the module.
+
+**Basic importing**
+
+When you have a module with exports, you can access the functionality in another module by using the `import` keyword. The two parts of an `import` statement are the identifiers you're importing and the mdule from which identifies  should be imported.
+
+```javascript
+import { identifier1, indentifier2 } from './example.js';
+```
+
+The curly braces after `import` indicate the bindings to import from a given module. The keyword `from` indicates the module from which to import the given binding. The module is specified by a string representing the path to the module (called the *module is specified*).
+
+> *The list of bindings to import looks similar toa destructured object, but it isn't one*
+
+You can import and use bindings fromthat module in a number of ways.
+
+**Importing a Single Binding**
+
+````javascript
+// import just one
+import { sum } from "./example.js";
+
+console.log(sum(1, 2));
+
+sum = 1;
+````
+
+If you try to assign a new value to `sum`, the result is an error because you can't reassign imported bindings.
+
+**Importing Multiple Bindings**
+
+````javascript
+// import multiple
+import { sum, multiply, magicNumber } from "./example.js";
+console.log(sum(1, magicNumber));	// 8
+console.log(multiply(1, 2));	// 2
+````
+
+**Importing an Entire Module**
+
+A special case allows you to import the entire module as a single object. All exports are then available on that object as properties.
+
+````javascript
+// import everything
+import * as example from './example.js';
+console.log(example.sum(1, 
+                       example.magicNumber)); // 8
+console.log(example.multiply(1, 2)); // 2
+````
+
+in this code, all exported bindings in *example.js* are loaded into an object called example and accessible as properties on example. This import format is called a *namespace import* because the example object doesn't exist inside the *example.js* file and is instead created to be used as a namespace object for all the exported members of *example.js*.
+
+Keep in mind that no matter how many times you use a module in `import` statements, the module will execute only once.
+
+**Renaming Exports and Imports**
+
+You can change the name of an export during the export and during the import. In the first case, suppose you have a function that you want to export with a different name. You can use the `as` keyword to specify the name that the function should be known as outside of the module:
+
+````javascript
+function sum(num1, num2) {
+  return num1 + num2;
+}
+
+export { sum as add};
+````
+
+When another module wants to import this function, it will have to use the name add:
+
+```javascript
+import { add } from './example.js';
+```
+
+if the module imorting the function wants to use a different name, it can also use as:
+
+```javascript
+import { add as sum } from './example.js';
+console.log(typeof add); // 'undefined'
+console.log(sum(1, 2)); // 3
+```
+
+This code imports the `add()` function using an *imort name* to rename the function `sum()`. Changing the function's local name on import means there is no identifier named `add()` in this module, even though the module import the `add()` function.
+
+**Default Values in Modules**
+
+The *default value* for a module is a single variable,  function, or class as specified by the `dafault` keyword, and you can only set one default export per module. Using the `dafault` keyword with multiple exports is a syntax error.
+
+**Exporting Default Values**
+
+````javascript
+export default function(num1, num2) {
+  return num1 + num2;
+}
+````
+
+The function doesn't require a name because the module represents the function. You can also specify an identifier as the default export by placing it after `export default`, like this:
+
+```javascript
+function sum(num1, num2) {
+  return num1 + num2; 
+}
+
+export default sum;
+```
+
+The identifier `default` has special meaning in a renaming export and indicates a value should be the daft for the module. This syntax is useful if you want to use a single export statement to specify multiple exports, including the default, simultaneously.
+
+**Importing Dafault Values**
+
+```javascript
+// import the default
+import sum from './example.js';
+
+console.log(sum(1, 2)); // 3
+```
+
+No curly braces are used, unlike what you'd see in a non-default import. For modules that export a default and one or more non-default bindings, you can import all exported bindings using one statement. For instance, suppose you have this module:
+
+```javascript
+export let color = 'red';
+
+export default function(num1, num2) {
+  return num1 + num2;
+}
+```
+
+You can import color and the default function using the following `import` statement:
+
+```javascript
+import sum, { color } from './example.js';
+
+console.log(sum(1, 2)); // 3
+console.log(color); // 'red'
+```
+
+The comma separates the default local name from the num-defaults, which are also surrounded by curly braces. Keep in mind that the default must come before the non-defaults in the `import` statement. As with exporting defaults, you can importing defaults with the renaming syntax, too:
+
+```javascript
+import { default as sum, color } from './example.js';
+
+console.log(sum(1, 2)); // 3
+console.log(color);
+```
+
+In this code, the default export (`default`) is renamed to `sum` and the additional `color` export is also imported.
+
+**Re-exporting a Binding**
+
+Eventually, you may want to re-export something that your module has imported. You can re-export an imported value using the patterns already discussed in this chapter, as fallows:
+
+````javascript
+import { sum } from "./example.js";
+export { sum };
+````
+
+Although that works, a single statement cad do the same task:
+
+````javascript
+export { sum } from "./example.js";
+````
+
+This from of  `export` looks into the specified module for the declaration of `sum` and then exports it. You can also export a different name for the same value:
+
+```javascript
+export { sum as add } from "./example.js";
+```
+
+Here, `sum` is imported from `example.js` and then exported as add. If you want to export everything. from a module, you can use the * pattern:
+
+```javascript
+export * from "./example.js";
+```
+
+By exporting everything, you're including the default as well as any named exports, which may affect what you can export  from your module. 
+
+> For instance, if *example.js* has a default export, you'd be unable to define a new default export when using this syntax.
+
+**Importing Without Bindings**
+
+Some modules may not export anything; instead, they might only modify object in the global scope.
+
+````javascript
+// module code without exports or imports
+Array.prototype.pushAll = function(items) {
+
+    // items must be an array
+    if (!Array.isArray(items)) {
+        throw new TypeError('Arguments must be an array');
+    }
+
+    // use built-in push() and spread operator
+    return this.push(...items);
+};
+````
+
+Because it doesn't export anything, you can use a simplified import to execute the module code without importing any bindings:
+
+````javascript
+import './example.js';
+
+let color = [ 'red', 'green', 'blue' ];
+let items = [];
+
+items.pushAll(colors);
+````
+
+> imorts without bindings are most likely to be used to create polyfills and shins.
+
+### Loading Modules
+
+**Using Modules in Web Browsers**
+
+Even before ECMAScript 6, web browsers had multiple ways of including JavaScript in a web application. Those script loading options are:
+
+* Loading JavaScript code files using the `<script>` element with the `src` attribute specifying a location from which to load the code.
+* Embedding JavaScript code inline using the `<script>` element without the `src` attribute
+* Loading JavaScript code files to execute as workers (such as a web worker or service worker)
+
+To fully support modules, web browsers had to update each of these mechanisms. These details are fully defined inthe HTML specification.
+
+**Using Modules with `<script>`**
+
+The default behavior of the `script` element is to load JavaScript files as scripts, not modules. This happens when the `type` attribute is missing or when the type attribute contains a JavaScript content type *(such as "text/javascript")*. The `<script>` element can then execute inline code or load the file specified in `src` as a module instead of a script.
+
+````html
+<!-- load a module JavaScript file -->
+<script type="module" src="module.js"></script>
+
+<!-- include a module inline -->
+<script type="module">
+	import { sum } from "./example.js";
+  
+  let result = sum(1, 2);
+</script>
+````
+
+**Module Loading Sequence in Web Browsers**
+
+Modules are unique in that, unlike scripts, they may use `import` to specify that other files must be loaded to execute correctly. to support that functionality. `<script type="module">` always acts as thought the `defer` attribute is applied.
+
+The `defer` attribute is optional for loading script files but is always applied for loading module files. The module file begins downloading as soon as the HTML parser encounters `<script type="module">` with a src attribute by doesn't execute until after the document has been completely parsed. Modules are also executed in the order in which they appear in the HTML file. That means the first `<script type="module">` is always guaranteed to execute before the second, even if one module contains inline code instead of specifying `src`. For example:
+
+```html
+<!-- this will executed first -->
+<script type="module" src="module1.js"></script>
+
+<!-- this will executed second -->
+<script type="module">
+    import { sum } from "./example.js";
+
+    let result = sum(1, 2);
+</script>
+ 
+<!-- this will executed third -->
+<script type="module" src="module2.js"></script>
+
+```
+
+These three `<script>` elements execute in the order they are specified, so the `module1.js` module is guaranteed to execute before the inline module and the inline module is guaranteed to execute before the `module.js` module.
+
+Each module can `import` from one or more other modules, which complicates matters. For that reason, modules are parsed completely first to identify all `import` statements. Each `import` statement then triggers a fetch *(either from the network or from the cable)*, and no module is executed multi.all `import` resources have been loaded and executed. 
+
+All modules, those explicitly  included using `<script type="module">` and those implicitly included using `import`, are loaded and executed in order.
+
+* Download and parse `module1.js`.
+* Recursivaly dowload an parse `import` resources in *module1.js*
+* Parse the inline module.
+* Recursively download and parse `import` resources in the inline module.
+* Download an parse *module2.js*.
+* Recursively download and parse `import` resources in `module2.js`
+
+
+
+When loading is completely, nothing is executed until after the document has been completely parsed. After documen parsing is completed, the following actions happen:
+
+* Recursively execute `import` resources for *module.js*
+* Execute `module.js`
+* Recursively execute `import` resources for the inline module.
+* Execute the inline module.
+* Recursively execute `import` resources for `module2.js`
+* Execute `module2.js`
+
+Notice that the inline module acts like the other two modules except the code doesn't have to be downloaded first. Otherwise, the sequence of loading `import` resources and executing modules is the same.
+
+> *The **defer** attribute is ignored on `<script type="module">` because it alrady behaves as though **defer** is applied*.
+
+**Asynchronous Module Loading in Web Browsers**
+
+When used with scripts, `async` causes the script file to be executed as soon as the file is completely dowloaded and parsed. The scripts are always executed as soon as they finish downloading without waiting for the containing document to finish parsing. The `async` attribute can be applied to modules as well. Using `async` on `<script type="module">` causes the module to execute in amanner similar to a script. The only difference is that all import resources for the module are downloaded before the module is executed. That guarantees all resources the module needs to function will be downloader before the module executes.
+
+````html
+<!-- no guarantee which one of these will execute first -->
+<script type="module" async src="module1.js"></script>
+<script type="module" async src="module2.js"></script>
+````
+
+In this example, two module files are loaded asynchronously. It's imposible to determine which module will execute first simply by looking at this code.
+
+**Loading Modules as Workers **
+
+Workers, such as web workers and service workers, execute JavaScript code outside of the web page context. Creating a new worker involves creating a new instance `Worker` (or another class) and passing in the location of the JavaScript file. The default loading mechanism is to load files as scripts, like this:
+
+```javascript
+// load script.js as a script
+let worker = new Worker("script.js");
+```
+
+To support loading modules, the developers of the HTML standard added a second argument to these constructors. The second argument is an object with a type property with a default value of "script". You can set `type` to "module" to load module files:
+
+```javascript
+// load module.js as module
+let worker = new Worker("module.js", { type: "module"});
+```
+
+
+
+
+
+
+
+
+
+
+
